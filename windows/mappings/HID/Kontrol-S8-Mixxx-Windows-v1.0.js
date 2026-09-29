@@ -15123,6 +15123,18 @@ var S8HidDecoder = (function () {
                 }
             });
         }
+        // Windows hidapi pads every input report to the largest one (109 bytes),
+        // so bindings captured there as R1/109 never see report 0x01 unpadded.
+        // Linux hidraw delivers it at its native 41 bytes. A field that lies
+        // wholly inside the declared canonical prefix is the same bytes either
+        // way; the state key stays per-domain, so nothing is shared.
+        if (view && view.kind === "CANONICAL_PREFIX_COMPATIBLE_CARRIER" &&
+                integer(view.length) && view.length < control.report_length &&
+                view.raw_length_preserved === control.report_length &&
+                field.byte_offset_with_report_id + field.field_width <= view.length &&
+                definition.lengths.indexOf(view.length) < 0) {
+            definition.lengths.push(view.length);
+        }
         definition.domain = "R" + control.report_id + "/" + control.report_length;
         if (control.encoding === "BITFIELD" &&
                 ["BUTTON", "PUSH", "TOUCH"].indexOf(control.signal_type) >= 0) {

@@ -16320,7 +16320,9 @@ var S8WindowsV1 = (function() {
 
     function refreshSlotFilterLedFields285(side) {
         for (var strip = 1; strip <= 4; strip += 1) {
-            setLedField285("SLOT_FILTER" + strip + "_" + side,
+            // Stems: lit = stem audible (Traktor stem deck); samplers: lit = muted.
+            setLedField285("SLOT_FILTER" + strip + "_" + side, stemActive(side, strip) ?
+                safeGet(stemGroup(side, strip), "mute") <= 0 :
                 safeGet("[Sampler" + samplerForStrip(side, strip) + "]", "mute", 0) > 0);
         }
     }
@@ -17280,6 +17282,32 @@ var S8WindowsV1 = (function() {
         return first + state.samplerBank[side] * 16 + pad - 1;
     }
 
+    // Stems (Mixxx 2.6+): while the side's deck holds a stem file, the four
+    // performance faders, ON buttons and lower knobs drive its stems (volume,
+    // mute, quick-effect super knob) instead of samplers, as on a Traktor stem
+    // deck. Mixxx 2.5 has no stem_count; probed once so it is never queried again.
+    var stemsSupported = null;
+
+    function stemCountForSide(side) {
+        if (stemsSupported === null) {
+            try {
+                stemsSupported = finite(engine.getValue("[Channel1]", "stem_count"));
+            } catch (error) {
+                stemsSupported = false;
+            }
+        }
+        return stemsSupported ?
+            Math.round(safeGet("[Channel" + deckForSide(side) + "]", "stem_count")) : 0;
+    }
+
+    function stemGroup(side, stem) {
+        return "[Channel" + deckForSide(side) + "_Stem" + stem + "]";
+    }
+
+    function stemActive(side, stem) {
+        return stem >= 1 && stem <= 4 && stemCountForSide(side) >= stem;
+    }
+
     function samplerForStrip(side, strip) {
         if (state.padMode[side] === "REMIX") {
             return samplerForPad(side, state.samplerColumns[side][strip - 1]);
@@ -17463,6 +17491,14 @@ var S8WindowsV1 = (function() {
                 return;
             }
             log("BROWSER_ON_BUTTON_RESERVED", {side: side, strip: strip});
+            return;
+        }
+        if (stemActive(side, strip)) {
+            toggle(stemGroup(side, strip), "mute");
+            refreshSlotFilterLedFields285(side);
+            sendLiveLedReport285(side === "LEFT" ? 0x80 : 0x81, "STEM_MUTE");
+            log("STEM_MUTE", {side: side, stem: strip,
+                muted: safeGet(stemGroup(side, strip), "mute") > 0});
             return;
         }
         var sampler = samplerForStrip(side, strip);
@@ -18517,7 +18553,11 @@ var S8WindowsV1 = (function() {
         match = /^FadFader([1-4])(Left|Right)$/.exec(controlId);
         if (match) {
             var faderSide = match[2] === "Left" ? "LEFT" : "RIGHT";
-            var sampler = samplerForStrip(faderSide, Number(match[1]));
+            var strip = Number(match[1]);
+            if (stemActive(faderSide, strip)) {
+                return {group: stemGroup(faderSide, strip), key: "volume", role: "STEM_VOLUME", side: faderSide};
+            }
+            var sampler = samplerForStrip(faderSide, strip);
             return {group: "[Sampler" + sampler + "]", key: "volume", role: "PERFORMANCE_FADER", side: faderSide};
         }
         return null;
@@ -18854,6 +18894,18 @@ var S8WindowsV1 = (function() {
                     trigger: "LOWER_ENCODER_4"});
                 return;
             }
+        }
+        if (knobMatch && delta !== 0 && stemActive(side, Number(knobMatch[1]))) {
+            var quickFx = "[QuickEffectRack1_" + stemGroup(side, Number(knobMatch[1])) + "]";
+            if (safeGet(quickFx, "enabled") <= 0) {
+                safeSet(quickFx, "enabled", 1);
+            }
+            // One full knob turn sweeps the whole range; SHIFT for fine steps.
+            var superValue = clamp(safeGet(quickFx, "super1") +
+                delta / ENDKNOB_MODULUS * (state.shifted[side] ? 0.25 : 1), 0, 1);
+            safeSet(quickFx, "super1", superValue);
+            log("STEM_QUICK_FX", {side: side, stem: Number(knobMatch[1]), super1: superValue});
+            return;
         }
         log("ENDKNOB_RELATIVE", {
             controlId: id,

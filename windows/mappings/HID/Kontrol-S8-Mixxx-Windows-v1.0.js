@@ -19373,9 +19373,15 @@ var S8WindowsV1 = (function() {
             state.beatgridEdit[side] = !state.beatgridEdit[side];
             log("BEATGRID_EDIT_CONTEXT", {side: side, enabled: state.beatgridEdit[side]});
         } else if (/^BtnQuantizeMixer$/.test(id)) {
-            toggle(groupForSide(state.lastSide), "quantize");
-            updateLedField285("QUANTIZE", safeGet(groupForSide(state.lastSide), "quantize") > 0,
-                "QUANTIZE_TOGGLE");
+            // One global switch as in Traktor: Mixxx keeps quantize per deck, so
+            // toggling only the focused deck left the others in whatever state
+            // they had while the LED showed just the focused one.
+            var quantizeOn = !(safeGet(groupForSide(state.lastSide), "quantize") > 0);
+            for (var quantizeDeck = 1; quantizeDeck <= 4; quantizeDeck += 1) {
+                safeSet("[Channel" + quantizeDeck + "]", "quantize", quantizeOn ? 1 : 0);
+            }
+            updateLedField285("QUANTIZE", quantizeOn, "QUANTIZE_TOGGLE_ALL");
+            log("QUANTIZE_ALL_DECKS", {enabled: quantizeOn});
         } else if (/^BtnSnapMixer$/.test(id)) {
             log("SNAP_CONTEXT_ONLY", {focusSide: state.lastSide, reason: "NO_DISTINCT_APPROVED_MIXXX_POLICY_259"});
         } else if (/^BtnTempoMixer$/.test(id)) {

@@ -15607,6 +15607,28 @@ var S8WindowsV1 = (function() {
     var browserStateConnection = null;
     var ledStateConnections285 = [];
     var ledLiveReports285 = Object.create(null);
+
+    // Controller setting "maximizeLibraryWhileBrowsing" (default true, the
+    // original behaviour). When false, the S8 browser leaves Mixxx's decks on
+    // screen: the mapping keeps "browser open" as its own state instead of
+    // mirroring it into [Skin],show_maximized_library, and never watches or
+    // writes that control. The S8 displays show the browser either way.
+    var MAXIMIZE_DESKTOP_LIBRARY = (function() {
+        try {
+            var value = engine.getSetting("maximizeLibraryWhileBrowsing");
+            return value === undefined || value === null ? true : !!value;
+        } catch (error) {
+            return true;
+        }
+    }());
+
+    // The focus-independent browser needs engine.setS8BrowserMode() and
+    // engine.s8BrowserEnter() from the Mixxx patch. Older patch builds keep the
+    // original focus-based navigation.
+    function nativeBrowserLevel() {
+        return typeof engine.setS8BrowserMode === "function" &&
+            typeof engine.s8BrowserEnter === "function";
+    }
     var pflLedConnections10004 = [];
     var bridgeGeneration = 0;
 
@@ -17546,28 +17568,6 @@ var S8WindowsV1 = (function() {
             });
         });
         publishAllSurfaceState();
-    }
-
-    // Controller setting "maximizeLibraryWhileBrowsing" (default true, the
-    // original behaviour). When false, the S8 browser leaves Mixxx's decks on
-    // screen: the mapping keeps "browser open" as its own state instead of
-    // mirroring it into [Skin],show_maximized_library, and never watches or
-    // writes that control. The S8 displays show the browser either way.
-    var MAXIMIZE_DESKTOP_LIBRARY = (function() {
-        try {
-            var value = engine.getSetting("maximizeLibraryWhileBrowsing");
-            return value === undefined || value === null ? true : !!value;
-        } catch (error) {
-            return true;
-        }
-    }());
-
-    // The focus-independent browser needs engine.setS8BrowserMode() and
-    // engine.s8BrowserEnter() from the Mixxx patch. Older patch builds keep the
-    // original focus-based navigation.
-    function nativeBrowserLevel() {
-        return typeof engine.setS8BrowserMode === "function" &&
-            typeof engine.s8BrowserEnter === "function";
     }
 
     function applyProgramBrowserState(expanded, ownerSide, origin, forceLog) {

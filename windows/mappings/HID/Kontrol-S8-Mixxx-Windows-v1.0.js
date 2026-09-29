@@ -15883,9 +15883,17 @@ var S8WindowsV1 = (function() {
     // protocol notes, and was confirmed on hardware: with B, G, R a red cue lit
     // blue, blue lit orange, yellow lit light blue). The name is kept to avoid
     // touching every caller.
+    // Mixxx colours are gamma-encoded screen values; the LEDs are linear, so
+    // mid-level channels look far too bright (orange lit yellow, light pink
+    // lit white). Gamma 2.2 decodes them to linear intensity.
+    function ledGamma285(channel) {
+        return Math.round(255 * Math.pow(channel / 255, 2.2));
+    }
+
     function rgbToBgr285(rgb) {
         var normalized = Math.floor(rgb) & 0xFFFFFF;
-        return [(normalized >> 16) & 0xFF, (normalized >> 8) & 0xFF, normalized & 0xFF];
+        return [ledGamma285((normalized >> 16) & 0xFF), ledGamma285((normalized >> 8) & 0xFF),
+            ledGamma285(normalized & 0xFF)];
     }
 
     function hotcueRgb285(group, pad) {

@@ -15776,6 +15776,9 @@ var S8WindowsV1 = (function() {
         Object.keys(LED_FIELDS_285).forEach(function(name) {
             setLedField285(name, false);
         });
+        // SYNC green channel; see SYNC_LED_COLOURS_285.
+        setPayloadIndexes285(0x80, [56], 0x00);
+        setPayloadIndexes285(0x81, [56], 0x00);
     }
 
     function sendLedReport285(reportId, payload, reason) {
@@ -16273,7 +16276,7 @@ var S8WindowsV1 = (function() {
         ["play_indicator", "cue_default", "slip_enabled"].forEach(function(control) {
             setLedField285(sideLedField285(side, control), safeGet(group, control, 0) > 0);
         });
-        setLedField285(sideLedField285(side, "sync_enabled"), syncIndicatorForSide(side));
+        setSyncLed285(side);
         refreshModeIdentity285(side);
         applyLoopRingFrame285(side, state.loopRingSegment[side]);
         setLedField285("FX_SELECT_" + side, !!state.fxSelectVisible[side]);
@@ -16287,24 +16290,35 @@ var S8WindowsV1 = (function() {
         }
     }
 
-    function syncIndicatorForSide(side) {
-        var deck = deckForSide(side);
-        var group = "[Channel" + deck + "]";
-        if (safeGet(group, "sync_leader", 0) <= 0) {
-            return safeGet(group, "sync_enabled", 0) > 0;
+    // SYNC is a red/green LED: payload 57 = red, 56 = green (confirmed on
+    // hardware; red+green = orange/yellow). The base reports left green at 0x14
+    // on deck A only, so SYNC used to look green/orange on the left and red on
+    // the right. Both bytes are now owned here: [red, green].
+    var SYNC_LED_COLOURS_285 = Object.freeze({
+        OFF: [0x14, 0x00],      // dim red
+        FOLLOWER: [0x00, 0x7F], // green
+        LEADER: [0x7F, 0x20]    // orange: synced and tempo master
+    });
+
+    function syncLedState285(side) {
+        var group = "[Channel" + deckForSide(side) + "]";
+        if (safeGet(group, "sync_enabled", 0) <= 0) {
+            return "OFF";
         }
-        for (var follower = 1; follower <= availableDeckCount(); follower += 1) {
-            if (follower !== deck && safeGet("[Channel" + follower + "]", "sync_enabled", 0) > 0) {
-                return true;
-            }
-        }
-        return false;
+        return safeGet(group, "sync_leader", 0) > 0 ? "LEADER" : "FOLLOWER";
+    }
+
+    function setSyncLed285(side) {
+        var colour = SYNC_LED_COLOURS_285[syncLedState285(side)];
+        var reportId = side === "LEFT" ? 0x80 : 0x81;
+        setPayloadIndexes285(reportId, [57], colour[0]);
+        setPayloadIndexes285(reportId, [56], colour[1]);
     }
 
     function refreshSyncIndicators285(reason) {
         ["LEFT", "RIGHT"].forEach(function(side) {
-            updateLedField285(sideLedField285(side, "sync_enabled"),
-                syncIndicatorForSide(side), reason);
+            setSyncLed285(side);
+            sendLiveLedReport285(side === "LEFT" ? 0x80 : 0x81, reason);
         });
     }
 

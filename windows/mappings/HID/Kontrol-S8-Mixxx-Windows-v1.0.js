@@ -15879,9 +15879,13 @@ var S8WindowsV1 = (function() {
         return 1 + ((pad - 1) * 3);
     }
 
+    // Pad LEDs take R, G, B in that order (matches PAD_COLOR_PALETTE in the
+    // protocol notes, and was confirmed on hardware: with B, G, R a red cue lit
+    // blue, blue lit orange, yellow lit light blue). The name is kept to avoid
+    // touching every caller.
     function rgbToBgr285(rgb) {
         var normalized = Math.floor(rgb) & 0xFFFFFF;
-        return [normalized & 0xFF, (normalized >> 8) & 0xFF, (normalized >> 16) & 0xFF];
+        return [(normalized >> 16) & 0xFF, (normalized >> 8) & 0xFF, normalized & 0xFF];
     }
 
     function hotcueRgb285(group, pad) {
@@ -15926,8 +15930,8 @@ var S8WindowsV1 = (function() {
         if (rawBase === null || !payload) {
             return false;
         }
-        // raw[0] is the report ID. A candidate pad occupies raw B,G,R and
-        // therefore payload indexes raw-1. Never reconstruct this shared frame.
+        // raw[0] is the report ID. A pad occupies raw R,G,B and therefore
+        // payload indexes raw-1. Never reconstruct this shared frame.
         var bgr = rgbToBgr285(performancePadRgb(side, pad));
         var payloadBase = rawBase - 1;
         payload[payloadBase] = bgr[0];

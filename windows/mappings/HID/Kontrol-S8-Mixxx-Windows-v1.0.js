@@ -15085,6 +15085,16 @@ var S8HidDecoder = (function () {
         return JSON.parse(JSON.stringify(value));
     }
 
+    // Samples are flat objects of primitives; a shallow copy is equivalent to
+    // copy() and avoids a JSON round trip per changed control per report.
+    function flat(sample) {
+        var out = {};
+        for (var key in sample) {
+            out[key] = sample[key];
+        }
+        return out;
+    }
+
     function fail(reason) {
         return {reason: reason};
     }
@@ -15323,11 +15333,11 @@ var S8HidDecoder = (function () {
                 var previous = state[key];
                 state[key] = sample;
                 if (!previous) {
-                    result.snapshots.push(copy(sample));
+                    result.snapshots.push(flat(sample));
                     return;
                 }
                 if (previous.rawValue === sample.rawValue) { return; }
-                var event = copy(sample);
+                var event = flat(sample);
                 if (definition.kind === "DIGITAL") {
                     event.eventType = sample.canonicalValue ? "PRESS" : "RELEASE";
                 } else if (definition.kind === "ABSOLUTE") {
@@ -15752,16 +15762,32 @@ var S8WindowsV1 = (function() {
         };
     }
 
+    // Controller setting "debugLogging" (default off). Every input event and
+    // every LED report used to be logged as JSON — ~100 lines/s at idle, many
+    // more while moving faders — which put serialisation and log I/O in the
+    // input path. Failures are always logged.
+    var DEBUG_LOGGING = (function() {
+        try {
+            return !!engine.getSetting("debugLogging");
+        } catch (error) {
+            return false;
+        }
+    }());
+    var ALWAYS_LOG = /FAIL|ERROR|INVALID|REJECT|UNAVAILABLE|UNSUPPORTED|CRASH|INIT$|PROVENANCE/;
+
     function log(event, payload) {
         var body = payload || {};
         body.event = event;
+        if (state) {
+            state.lastAction = body;
+        }
+        if (!DEBUG_LOGGING && !ALWAYS_LOG.test(event)) {
+            return;
+        }
         try {
             console.info(LOG_PREFIX + JSON.stringify(body));
         } catch (error) {
             console.info(LOG_PREFIX + event);
-        }
-        if (state) {
-            state.lastAction = body;
         }
     }
 

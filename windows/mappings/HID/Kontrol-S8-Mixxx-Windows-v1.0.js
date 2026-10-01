@@ -17135,6 +17135,10 @@ var S8WindowsV1 = (function() {
         ["A", "B", "C", "D"].forEach(function(letter) {
             var channel = channelFromLetter(letter);
             var channelGroup = "[Channel" + channel + "]";
+            // Stem effects are off: the stem knobs do not drive them.
+            for (var stem = 1; stem <= 4; stem += 1) {
+                safeSet("[QuickEffectRack1_[Channel" + channel + "_Stem" + stem + "]]", "enabled", 0);
+            }
             enableSoftTakeover(channelGroup, "pregain");
             enableSoftTakeover(channelGroup, "volume");
             enableSoftTakeover("[EqualizerRack1_[Channel" + channel + "]_Effect1]", "parameter1");
@@ -17354,60 +17358,6 @@ var S8WindowsV1 = (function() {
 
     function stemGroup(side, stem) {
         return "[Channel" + deckForSide(side) + "_Stem" + stem + "]";
-    }
-
-    // Crossing the middle stops the value at 0.5 until the knob has turned a
-    // further 1/16 turn in the same direction.
-    var STEM_KNOB_DETENT = 1 / 16;
-    var stemKnobHold = {};
-    function stemKnobWithDetent(side, stem, value, step) {
-        var key = side + stem;
-        var hold = stemKnobHold[key];
-        if (hold !== undefined && value !== 0.5) {
-            delete stemKnobHold[key];
-            hold = undefined;
-        }
-        if (hold !== undefined) {
-            if (step * hold.direction < 0) {
-                delete stemKnobHold[key];
-                return clamp(0.5 + step, 0, 1);
-            }
-            hold.travel += Math.abs(step);
-            if (hold.travel < STEM_KNOB_DETENT) {
-                return 0.5;
-            }
-            delete stemKnobHold[key];
-            return clamp(0.5 + hold.direction * (hold.travel - STEM_KNOB_DETENT), 0, 1);
-        }
-        var next = clamp(value + step, 0, 1);
-        if (value !== 0.5 && (value - 0.5) * (next - 0.5) <= 0) {
-            stemKnobHold[key] = {direction: step > 0 ? 1 : -1,
-                travel: Math.abs(next - 0.5)};
-            return 0.5;
-        }
-        return next;
-    }
-
-    var STEM_EFFECT_STEP = ENDKNOB_MODULUS / 16;
-    var stemEffectTravel = {};
-    function stepStemEffect(side, stem, delta) {
-        var key = side + stem;
-        var travel = (stemEffectTravel[key] || 0) + delta;
-        var group = "[QuickEffectRack1_" + stemGroup(side, stem) + "]";
-        while (Math.abs(travel) >= STEM_EFFECT_STEP) {
-            pulse(group, travel > 0 ? "next_chain_preset" : "prev_chain_preset");
-            travel -= travel > 0 ? STEM_EFFECT_STEP : -STEM_EFFECT_STEP;
-        }
-        stemEffectTravel[key] = travel;
-    }
-    // The display arrows step all stems of the deck together.
-    function stepAllStemEffects(side, direction) {
-        for (var stem = 1; stem <= 4; stem += 1) {
-            if (stemActive(side, stem)) {
-                pulse("[QuickEffectRack1_" + stemGroup(side, stem) + "]",
-                    direction > 0 ? "next_chain_preset" : "prev_chain_preset");
-            }
-        }
     }
 
     function stemActive(side, stem) {
@@ -19013,22 +18963,7 @@ var S8WindowsV1 = (function() {
             }
         }
         if (knobMatch && delta !== 0 && stemActive(side, Number(knobMatch[1]))) {
-            var quickFx = "[QuickEffectRack1_" + stemGroup(side, Number(knobMatch[1])) + "]";
-            if (safeGet(quickFx, "enabled") <= 0) {
-                safeSet(quickFx, "enabled", 1);
-            }
-            if (state.shifted[side]) {
-                // SHIFT + turn steps through the quick-effect presets of this
-                // stem (Filter, Echo, Reverb, ...), one per 1/16 turn.
-                stepStemEffect(side, Number(knobMatch[1]), delta);
-                return;
-            }
-            // One full knob turn sweeps the whole range, with a detent in the
-            // middle (neutral for filters).
-            var superValue = stemKnobWithDetent(side, Number(knobMatch[1]),
-                safeGet(quickFx, "super1"), delta / ENDKNOB_MODULUS);
-            safeSet(quickFx, "super1", superValue);
-            log("STEM_QUICK_FX", {side: side, stem: Number(knobMatch[1]), super1: superValue});
+            // Stem effects are switched off; the knobs do nothing on stems.
             return;
         }
         log("ENDKNOB_RELATIVE", {
@@ -19378,7 +19313,6 @@ var S8WindowsV1 = (function() {
             display.activePanel = ACTIVE_PANEL.KEY;
         } else if (action === "STEMS_FX_SELECTOR_PREVIOUS") {
             display.stemsPage = wrapIndex(display.stemsPage, -1, 2);
-            stepAllStemEffects(side, -1);
         } else if (action === "TWO_DECK_VIEW_LOCAL") {
             display.viewMode = display.viewMode === DISPLAY_VIEW.TWO ? DISPLAY_VIEW.SINGLE : DISPLAY_VIEW.TWO;
             display.activePanel = ACTIVE_PANEL.NONE;
@@ -19390,7 +19324,6 @@ var S8WindowsV1 = (function() {
             display.waveformZoom = clamp(display.waveformZoom - 1, 0, 9);
         } else if (action === "STEMS_FX_SELECTOR_NEXT") {
             display.stemsPage = wrapIndex(display.stemsPage, 1, 2);
-            stepAllStemEffects(side, 1);
         } else if (action === "DISPLAY_SETTINGS") {
             display.settingsOpen = true;
             display.activePanel = ACTIVE_PANEL.SETTINGS;

@@ -15775,6 +15775,19 @@ var S8WindowsV1 = (function() {
     }());
     var ALWAYS_LOG = /FAIL|ERROR|INVALID|REJECT|UNAVAILABLE|UNSUPPORTED|CRASH|INIT$|PROVENANCE/;
 
+    // Controller setting "linearChannelFaders" (default on). Mixxx gives the
+    // channel "volume" an audio taper (-20..0 dB over the fader travel), so
+    // half travel is -12 dB; stem volume has none (half travel = -6 dB).
+    // Writing the value instead of the parameter makes the channel faders
+    // linear gain like the stem faders.
+    var LINEAR_CHANNEL_FADERS = (function() {
+        try {
+            return engine.getSetting("linearChannelFaders") !== false;
+        } catch (error) {
+            return true;
+        }
+    }());
+
     function log(event, payload) {
         var body = payload || {};
         body.event = event;
@@ -18960,7 +18973,11 @@ var S8WindowsV1 = (function() {
         if (normalized === null) {
             return;
         }
-        safeSetParameter(target.group, target.key, normalized);
+        if (target.role === "LINEFADER" && LINEAR_CHANNEL_FADERS) {
+            safeSet(target.group, target.key, normalized);
+        } else {
+            safeSetParameter(target.group, target.key, normalized);
+        }
         log("ANALOG_ACTION", {
             controlId: id,
             group: target.group,

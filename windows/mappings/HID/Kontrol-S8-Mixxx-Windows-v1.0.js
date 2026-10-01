@@ -18702,7 +18702,11 @@ var S8WindowsV1 = (function() {
 
     function nativeSortCriteria() {
         var browserSort = nativeBrowserSortState();
-        return Array.isArray(browserSort.sortCriteria) ? browserSort.sortCriteria : [];
+        // A QVariantList can arrive as an array-like sequence for which
+        // Array.isArray() is false (Qt 6 on Linux).
+        var criteria = browserSort.sortCriteria;
+        return criteria && typeof criteria.length === "number" ?
+            Array.prototype.slice.call(criteria) : [];
     }
 
     function criteriaIndexOf(criteria, columnId) {
@@ -18730,7 +18734,11 @@ var S8WindowsV1 = (function() {
         }
         var criteria = nativeSortCriteria();
         if (!criteria.length) {
-            log("BROWSER_SORT_UNAVAILABLE", {side: side, reason: "NO_NATIVE_SORT_CRITERIA"});
+            var probe = nativeBrowserSortState();
+            log("BROWSER_SORT_UNAVAILABLE", {side: side, reason: "NO_NATIVE_SORT_CRITERIA",
+                available: probe.available, mode: probe.mode, path: probe.path,
+                sortLabel: probe.sortLabel, criteriaType: Object.prototype.toString.call(probe.sortCriteria),
+                criteriaLength: probe.sortCriteria ? probe.sortCriteria.length : null});
             return null;
         }
         var browserSort = nativeBrowserSortState();

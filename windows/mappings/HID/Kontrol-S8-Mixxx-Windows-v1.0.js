@@ -15780,6 +15780,19 @@ var S8WindowsV1 = (function() {
     // half travel is -12 dB; stem volume has none (half travel = -6 dB).
     // Writing the value instead of the parameter makes the channel faders
     // linear gain like the stem faders.
+    // Controller setting "samplerPadsGate" (default on): a sample pad plays
+    // only while held and returns to the sample start on release. Off: press
+    // starts the whole sample, Shift+pad stops it.
+    var SAMPLER_PADS_GATE = (function() {
+        try {
+            return engine.getSetting("samplerPadsGate") !== false;
+        } catch (error) {
+            return true;
+        }
+    }());
+    // Samplers started by a held pad, keyed by side + pad number.
+    var gatedSamplers = {};
+
     var LINEAR_CHANNEL_FADERS = (function() {
         try {
             return engine.getSetting("linearChannelFaders") !== false;
@@ -17503,6 +17516,9 @@ var S8WindowsV1 = (function() {
             if (samplerForPad(side, pad) <= safeGet("[App]", "num_samplers") &&
                     safeGet(samplerGroup, "track_loaded") > 0) {
                 pulse(samplerGroup, state.shifted[side] ? "cue_gotoandstop" : "start_play");
+                if (SAMPLER_PADS_GATE && !state.shifted[side]) {
+                    gatedSamplers[side + pad] = samplerGroup;
+                }
             } else {
                 log("SAMPLER_PAD_UNAVAILABLE", {side: side, pad: pad, group: samplerGroup});
             }
@@ -19624,6 +19640,10 @@ var S8WindowsV1 = (function() {
         }
         if (/^BtnPad[1-8]/.test(id) && state.padMode[side] === "SLICER") {
             releaseSlice(side, padNumber(id));
+        }
+        if (/^BtnPad[1-8]/.test(id) && gatedSamplers[side + padNumber(id)]) {
+            pulse(gatedSamplers[side + padNumber(id)], "cue_gotoandstop");
+            delete gatedSamplers[side + padNumber(id)];
         }
         if (/^BtnShiftButton/.test(id)) {
             state.shifted[side] = false;

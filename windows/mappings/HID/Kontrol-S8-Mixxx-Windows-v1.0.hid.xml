@@ -17,6 +17,10 @@
         label="Debug logging (every input event and LED report)">
       <description>Off for performance: logging each event adds latency to fast fader moves.</description>
     </option>
+    <option variable="samplerPadsGate" type="boolean" default="true"
+        label="Sample pads play only while held">
+      <description>Release stops the sample and returns to its start. Off: a press plays the whole sample, Shift+pad stops it.</description>
+    </option>
     <option variable="linearChannelFaders" type="boolean" default="true"
         label="Linear channel faders (gain follows the fader, like the stem faders)">
       <description>Off uses Mixxx's audio taper: -20..0 dB over the travel, half travel = -12 dB.</description>

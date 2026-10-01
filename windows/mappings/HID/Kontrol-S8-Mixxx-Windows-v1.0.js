@@ -19427,9 +19427,10 @@ var S8WindowsV1 = (function() {
             if (!active || state.backDown[side] !== down || !state.browserVisible[side]) {
                 return;
             }
+            // Hold BACK: leave the browser in one gesture; a short press still
+            // walks up one level.
             down.consumed = true;
-            var changed = typeof engine.s8BrowserBack === "function" && engine.s8BrowserBack(true);
-            log("BROWSER_BACK_ROOT", {side: side, changed: !!changed});
+            closeBrowser("BACK_HOLD", side);
         });
     }
 

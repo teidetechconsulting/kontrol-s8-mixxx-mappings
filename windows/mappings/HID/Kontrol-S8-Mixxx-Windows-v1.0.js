@@ -17356,6 +17356,38 @@ var S8WindowsV1 = (function() {
         return "[Channel" + deckForSide(side) + "_Stem" + stem + "]";
     }
 
+    // Crossing the middle stops the value at 0.5 until the knob has turned a
+    // further 1/16 turn in the same direction.
+    var STEM_KNOB_DETENT = 1 / 16;
+    var stemKnobHold = {};
+    function stemKnobWithDetent(side, stem, value, step) {
+        var key = side + stem;
+        var hold = stemKnobHold[key];
+        if (hold !== undefined && value !== 0.5) {
+            delete stemKnobHold[key];
+            hold = undefined;
+        }
+        if (hold !== undefined) {
+            if (step * hold.direction < 0) {
+                delete stemKnobHold[key];
+                return clamp(0.5 + step, 0, 1);
+            }
+            hold.travel += Math.abs(step);
+            if (hold.travel < STEM_KNOB_DETENT) {
+                return 0.5;
+            }
+            delete stemKnobHold[key];
+            return clamp(0.5 + hold.direction * (hold.travel - STEM_KNOB_DETENT), 0, 1);
+        }
+        var next = clamp(value + step, 0, 1);
+        if (value !== 0.5 && (value - 0.5) * (next - 0.5) <= 0) {
+            stemKnobHold[key] = {direction: step > 0 ? 1 : -1,
+                travel: Math.abs(next - 0.5)};
+            return 0.5;
+        }
+        return next;
+    }
+
     var STEM_EFFECT_STEP = ENDKNOB_MODULUS / 16;
     var stemEffectTravel = {};
     function stepStemEffect(side, stem, delta) {
@@ -18991,8 +19023,10 @@ var S8WindowsV1 = (function() {
                 stepStemEffect(side, Number(knobMatch[1]), delta);
                 return;
             }
-            // One full knob turn sweeps the whole range.
-            var superValue = clamp(safeGet(quickFx, "super1") + delta / ENDKNOB_MODULUS, 0, 1);
+            // One full knob turn sweeps the whole range, with a detent in the
+            // middle (neutral for filters).
+            var superValue = stemKnobWithDetent(side, Number(knobMatch[1]),
+                safeGet(quickFx, "super1"), delta / ENDKNOB_MODULUS);
             safeSet(quickFx, "super1", superValue);
             log("STEM_QUICK_FX", {side: side, stem: Number(knobMatch[1]), super1: superValue});
             return;

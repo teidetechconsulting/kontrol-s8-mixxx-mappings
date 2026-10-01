@@ -18209,20 +18209,19 @@ var S8WindowsV1 = (function() {
         var display = state.display[side];
         var group = groupForSide(side);
         if (display.activePanel === ACTIVE_PANEL.BPM) {
-            var step = bpmStep(state.shifted[side]);
-            var currentBpm = safeGet(group, "bpm") || safeGet(group, "visual_bpm");
-            // Decoder 269 reports the raw decrement as CW (the same
-            // operational inversion used by Browser navigation).  Preserve
-            // that correction locally: physical clockwise raises BPM.
-            var bpmDelta = event.direction === "CW" ? -step : step;
-            if (currentBpm > 0) {
-                var requestedBpm = quantizeBpm(Math.max(1, currentBpm + bpmDelta * magnitude));
-                var written = safeSet(group, "bpm", requestedBpm);
-                var actualBpm = safeGet(group, "bpm");
-                log("BPM_WRITE_RESULT", {side: side, requestedBpm: requestedBpm,
-                    actualBpm: actualBpm, accepted: written && Math.abs(actualBpm - requestedBpm) < 0.0001});
+            // The track's BPM (beat grid), not the playback tempo: 1 BPM per
+            // step onto whole values, SHIFT 0.01. Decoder 269 reports the raw
+            // decrement as CW, so physical clockwise is "CCW" here.
+            var up = event.direction !== "CW";
+            var fileBpm = safeGet(group, "file_bpm");
+            if (fileBpm > 0) {
+                var gridDelta = state.shifted[side] ?
+                    (up ? 0.01 : -0.01) * magnitude :
+                    (up ? Math.floor(fileBpm + 0.005) + magnitude : Math.ceil(fileBpm - 0.005) - magnitude) - fileBpm;
+                safeSet(group, "beats_adjust_by", gridDelta);
+                log("TRACK_BPM_ADJUSTED", {side: side, from: fileBpm, delta: gridDelta,
+                    to: safeGet(group, "file_bpm")});
             }
-            log("BPM_ACTUATED", {side: side, delta: bpmDelta * magnitude});
             return;
         }
         if (display.activePanel === ACTIVE_PANEL.KEY) {
@@ -19209,6 +19208,18 @@ var S8WindowsV1 = (function() {
         publishAllSurfaceState();
     }
 
+    // Screen buttons while the BPM panel is open (button 2 closes it). Labels
+    // are drawn next to the buttons by the screen QML.
+    var BPM_PANEL_BUTTONS = Object.freeze({
+        1: "bpm_tap",
+        3: "beats_translate_curpos",
+        4: "beats_set_halve",
+        5: "beats_undo_adjustment",
+        6: "beats_translate_earlier",
+        7: "beats_translate_later",
+        8: "beats_set_double"
+    });
+
     var DISPLAY_ACTIONS_NO_SHIFT = Object.freeze([
         null, "FOUR_DECK_VIEW", "BPM_GRANULAR_OVERLAY", "KEY_LOCK_KEY_SET_CONTEXT",
         "STEMS_FX_SELECTOR_PREVIOUS", "TWO_DECK_VIEW_LOCAL", "WAVEFORM_ZOOM_IN",
@@ -19382,6 +19393,15 @@ var S8WindowsV1 = (function() {
         if (edge !== "PRESS") {
             log("DISPLAY_BUTTON_RELEASE", logicalEvent);
             return false;
+        }
+        if (logicalEvent.context === "DECK_VIEW" && button !== 2 &&
+                state.display[side].activePanel === ACTIVE_PANEL.BPM &&
+                BPM_PANEL_BUTTONS[button]) {
+            // BPM panel: the screen buttons edit the track's beat grid.
+            pulse(groupForSide(side), BPM_PANEL_BUTTONS[button]);
+            logicalEvent.action = "BPM_PANEL_" + BPM_PANEL_BUTTONS[button].toUpperCase();
+            log("BPM_PANEL_BUTTON", logicalEvent);
+            return true;
         }
         if (button === 5 && (logicalEvent.context !== "DECK_VIEW" ||
                 state.masterTempoPopup ||

@@ -17356,6 +17356,28 @@ var S8WindowsV1 = (function() {
         return "[Channel" + deckForSide(side) + "_Stem" + stem + "]";
     }
 
+    var STEM_EFFECT_STEP = ENDKNOB_MODULUS / 16;
+    var stemEffectTravel = {};
+    function stepStemEffect(side, stem, delta) {
+        var key = side + stem;
+        var travel = (stemEffectTravel[key] || 0) + delta;
+        var group = "[QuickEffectRack1_" + stemGroup(side, stem) + "]";
+        while (Math.abs(travel) >= STEM_EFFECT_STEP) {
+            pulse(group, travel > 0 ? "next_chain_preset" : "prev_chain_preset");
+            travel -= travel > 0 ? STEM_EFFECT_STEP : -STEM_EFFECT_STEP;
+        }
+        stemEffectTravel[key] = travel;
+    }
+    // The display arrows step all stems of the deck together.
+    function stepAllStemEffects(side, direction) {
+        for (var stem = 1; stem <= 4; stem += 1) {
+            if (stemActive(side, stem)) {
+                pulse("[QuickEffectRack1_" + stemGroup(side, stem) + "]",
+                    direction > 0 ? "next_chain_preset" : "prev_chain_preset");
+            }
+        }
+    }
+
     function stemActive(side, stem) {
         return stem >= 1 && stem <= 4 && stemCountForSide(side) >= stem;
     }
@@ -18963,9 +18985,14 @@ var S8WindowsV1 = (function() {
             if (safeGet(quickFx, "enabled") <= 0) {
                 safeSet(quickFx, "enabled", 1);
             }
-            // One full knob turn sweeps the whole range; SHIFT for fine steps.
-            var superValue = clamp(safeGet(quickFx, "super1") +
-                delta / ENDKNOB_MODULUS * (state.shifted[side] ? 0.25 : 1), 0, 1);
+            if (state.shifted[side]) {
+                // SHIFT + turn steps through the quick-effect presets of this
+                // stem (Filter, Echo, Reverb, ...), one per 1/16 turn.
+                stepStemEffect(side, Number(knobMatch[1]), delta);
+                return;
+            }
+            // One full knob turn sweeps the whole range.
+            var superValue = clamp(safeGet(quickFx, "super1") + delta / ENDKNOB_MODULUS, 0, 1);
             safeSet(quickFx, "super1", superValue);
             log("STEM_QUICK_FX", {side: side, stem: Number(knobMatch[1]), super1: superValue});
             return;
@@ -19317,6 +19344,7 @@ var S8WindowsV1 = (function() {
             display.activePanel = ACTIVE_PANEL.KEY;
         } else if (action === "STEMS_FX_SELECTOR_PREVIOUS") {
             display.stemsPage = wrapIndex(display.stemsPage, -1, 2);
+            stepAllStemEffects(side, -1);
         } else if (action === "TWO_DECK_VIEW_LOCAL") {
             display.viewMode = display.viewMode === DISPLAY_VIEW.TWO ? DISPLAY_VIEW.SINGLE : DISPLAY_VIEW.TWO;
             display.activePanel = ACTIVE_PANEL.NONE;
@@ -19328,6 +19356,7 @@ var S8WindowsV1 = (function() {
             display.waveformZoom = clamp(display.waveformZoom - 1, 0, 9);
         } else if (action === "STEMS_FX_SELECTOR_NEXT") {
             display.stemsPage = wrapIndex(display.stemsPage, 1, 2);
+            stepAllStemEffects(side, 1);
         } else if (action === "DISPLAY_SETTINGS") {
             display.settingsOpen = true;
             display.activePanel = ACTIVE_PANEL.SETTINGS;

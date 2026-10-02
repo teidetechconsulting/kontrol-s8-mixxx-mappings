@@ -17477,10 +17477,30 @@ var S8WindowsV1 = (function() {
         publishSurfaceState(side);
     }
 
+    var captureHeld = {LEFT: false, RIGHT: false};
+
+    function capturePad(side, pad) {
+        var sampler = samplerForPad(side, pad);
+        var started = false;
+        try {
+            started = typeof engine.s8CaptureToSampler === "function" &&
+                engine.s8CaptureToSampler(groupForSide(side), sampler);
+        } catch (error) {
+            log("CAPTURE_FAILED", {side: side, pad: pad, sampler: sampler, error: String(error)});
+            return;
+        }
+        log(started ? "CAPTURE_STARTED" : "CAPTURE_UNAVAILABLE",
+            {side: side, pad: pad, sampler: sampler, deck: groupForSide(side)});
+    }
+
     function handlePadPress(controlId, side) {
         var pad = padNumber(controlId);
         var group = groupForSide(side);
         var mode = state.padMode[side];
+        if (pad && captureHeld[side]) {
+            capturePad(side, pad);
+            return;
+        }
         if (!pad) {
             return;
         }
@@ -19641,7 +19661,11 @@ var S8WindowsV1 = (function() {
         } else if (/^BtnBackButton/.test(id)) {
             backPress(side);
         } else if (/^BtnCaptureButton/.test(id)) {
-            log("CAPTURE_CONTEXT_ONLY", {side: side});
+            // Hold CAPTURE and press a pad: the deck (stems at their current
+            // volume) goes into that pad's sample slot. The pads show the
+            // slots while capturing and stay there to play the result.
+            captureHeld[side] = true;
+            setPadMode(side, "REMIX");
         } else {
             log("BUTTON_CONTEXT_ONLY", {controlId: id, side: side});
         }
@@ -19653,6 +19677,9 @@ var S8WindowsV1 = (function() {
         updateMomentaryLed285(id, side, false);
         if (/^Btn(Slice|Remix)Button/.test(id)) {
             state.touch[id] = false;
+        }
+        if (/^BtnCaptureButton/.test(id)) {
+            captureHeld[side] = false;
         }
         if (/^BtnPad[1-8]/.test(id) && state.padMode[side] === "SLICER") {
             releaseSlice(side, padNumber(id));

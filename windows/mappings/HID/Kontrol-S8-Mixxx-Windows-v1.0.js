@@ -15804,6 +15804,14 @@ var S8WindowsV1 = (function() {
         }
     }());
 
+    var SOFT_TAKEOVER = (function() {
+        try {
+            return engine.getSetting("softTakeover") === true;
+        } catch (error) {
+            return false;
+        }
+    }());
+
     function log(event, payload) {
         var body = payload || {};
         body.event = event;
@@ -16934,7 +16942,7 @@ var S8WindowsV1 = (function() {
 
     function enableSoftTakeover(group, key) {
         var id = group + "|" + key;
-        if (softTakeoverTargets[id]) {
+        if (!SOFT_TAKEOVER || softTakeoverTargets[id]) {
             return;
         }
         softTakeoverTargets[id] = true;

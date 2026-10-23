@@ -10469,17 +10469,18 @@ var S8Canonical259 = (function () {
         "cw_code": null,
         "direction": "DECREASING",
         "encoding": "ABSOLUTE_POSITION",
-        "endianness": "NOT_APPLICABLE",
+        "endianness": "LE",
         "field": {
           "bit_mask": null,
           "bit_mask_hex": null,
           "byte_masks": [
+            "0xFF",
             "0xFF"
           ],
-          "byte_offset_with_report_id": 34,
-          "field_width": 1,
+          "byte_offset_with_report_id": 33,
+          "field_width": 2,
           "modulus": null,
-          "payload_offset_without_report_id": 33,
+          "payload_offset_without_report_id": 32,
           "shift": null
         },
         "idle_value": null,
@@ -10487,7 +10488,7 @@ var S8Canonical259 = (function () {
         "notes": [
           "varia\u00e7\u00e3o num\u00e9rica coincide com o binding persistido"
         ],
-        "observed_max": 15,
+        "observed_max": 4095,
         "observed_min": 0,
         "physical_component_type": "FADER",
         "physical_label": "Fad Linefader AMixer",
@@ -10548,17 +10549,18 @@ var S8Canonical259 = (function () {
         "cw_code": null,
         "direction": "DECREASING",
         "encoding": "ABSOLUTE_POSITION",
-        "endianness": "NOT_APPLICABLE",
+        "endianness": "LE",
         "field": {
           "bit_mask": null,
           "bit_mask_hex": null,
           "byte_masks": [
+            "0xFF",
             "0xFF"
           ],
-          "byte_offset_with_report_id": 36,
-          "field_width": 1,
+          "byte_offset_with_report_id": 35,
+          "field_width": 2,
           "modulus": null,
-          "payload_offset_without_report_id": 35,
+          "payload_offset_without_report_id": 34,
           "shift": null
         },
         "idle_value": null,
@@ -10566,7 +10568,7 @@ var S8Canonical259 = (function () {
         "notes": [
           "varia\u00e7\u00e3o num\u00e9rica coincide com o binding persistido"
         ],
-        "observed_max": 15,
+        "observed_max": 4095,
         "observed_min": 0,
         "physical_component_type": "FADER",
         "physical_label": "Fad Linefader BMixer",
@@ -10707,17 +10709,18 @@ var S8Canonical259 = (function () {
         "cw_code": null,
         "direction": "INCREASING",
         "encoding": "ABSOLUTE_POSITION",
-        "endianness": "NOT_APPLICABLE",
+        "endianness": "LE",
         "field": {
           "bit_mask": null,
           "bit_mask_hex": null,
           "byte_masks": [
+            "0xFF",
             "0xFF"
           ],
-          "byte_offset_with_report_id": 40,
-          "field_width": 1,
+          "byte_offset_with_report_id": 39,
+          "field_width": 2,
           "modulus": null,
-          "payload_offset_without_report_id": 39,
+          "payload_offset_without_report_id": 38,
           "shift": null
         },
         "idle_value": null,
@@ -10725,7 +10728,7 @@ var S8Canonical259 = (function () {
         "notes": [
           "varia\u00e7\u00e3o num\u00e9rica coincide com o binding persistido"
         ],
-        "observed_max": 15,
+        "observed_max": 4095,
         "observed_min": 0,
         "physical_component_type": "FADER",
         "physical_label": "Fad Linefader DMixer",

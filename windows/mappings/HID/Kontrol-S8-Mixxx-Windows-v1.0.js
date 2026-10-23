@@ -15617,6 +15617,7 @@ var S8WindowsV1 = (function() {
     var state = null;
     var held = Object.create(null);
     var softTakeoverTargets = Object.create(null);
+    var lastAnalogTarget = Object.create(null);
     var browserStateConnection = null;
     var ledStateConnections285 = [];
     var ledLiveReports285 = Object.create(null);
@@ -16940,9 +16941,36 @@ var S8WindowsV1 = (function() {
         safeSet(group, key, safeGet(group, key) ? 0 : 1);
     }
 
-    function enableSoftTakeover(group, key) {
+    // Deck-section controls change target with the focused deck, stem/sampler
+    // mode and FX selection, so they always use soft takeover; the mixer
+    // section only when the softTakeover setting asks for it.
+    var DECK_SECTION_ROLES = {
+        STEM_VOLUME: true,
+        PERFORMANCE_FADER: true,
+        FX_MIX: true,
+        FX_META: true,
+        FX_SINGLE_PARAMETER: true
+    };
+
+    function pickUpOnRetarget(controlId, target) {
+        var targetId = target.group + "|" + target.key;
+        if (lastAnalogTarget[controlId] === targetId) {
+            return;
+        }
+        lastAnalogTarget[controlId] = targetId;
+        enableSoftTakeover(target.group, target.key, true);
+        // Mixxx remembers this control's last hardware value from before the
+        // switch and would accept the first move as a jump.
+        try {
+            engine.softTakeoverIgnoreNextValue(target.group, target.key);
+        } catch (error) {
+            log("SOFT_TAKEOVER_UNAVAILABLE", {group: target.group, key: target.key, error: String(error)});
+        }
+    }
+
+    function enableSoftTakeover(group, key, always) {
         var id = group + "|" + key;
-        if (!SOFT_TAKEOVER || softTakeoverTargets[id]) {
+        if ((!SOFT_TAKEOVER && !always) || softTakeoverTargets[id]) {
             return;
         }
         softTakeoverTargets[id] = true;
@@ -17160,19 +17188,24 @@ var S8WindowsV1 = (function() {
         enableSoftTakeover("[Master]", "crossfader");
         [1, 2, 3, 4].forEach(function(unitNumber) {
             var unit = "[EffectRack1_EffectUnit" + unitNumber + "]";
-            enableSoftTakeover(unit, "mix");
+            enableSoftTakeover(unit, "mix", true);
             [1, 2, 3].forEach(function(slot) {
                 var slotGroup = "[EffectRack1_EffectUnit" + unitNumber + "_Effect" + slot + "]";
-                enableSoftTakeover(slotGroup, "meta");
+                enableSoftTakeover(slotGroup, "meta", true);
                 [1, 2, 3].forEach(function(parameter) {
-                    enableSoftTakeover(slotGroup, "parameter" + parameter);
+                    enableSoftTakeover(slotGroup, "parameter" + parameter, true);
                 });
             });
+        });
+        [1, 2, 3, 4].forEach(function(channel) {
+            for (var stem = 1; stem <= 4; stem += 1) {
+                enableSoftTakeover("[Channel" + channel + "_Stem" + stem + "]", "volume", true);
+            }
         });
         ["LEFT", "RIGHT"].forEach(function(side) {
             var baseSampler = side === "LEFT" ? 1 : 5;
             [0, 1, 2, 3].forEach(function(index) {
-                enableSoftTakeover("[Sampler" + (baseSampler + index) + "]", "volume");
+                enableSoftTakeover("[Sampler" + (baseSampler + index) + "]", "volume", true);
             });
         });
     }
@@ -17190,6 +17223,7 @@ var S8WindowsV1 = (function() {
                 Math.round(persistedPreference("waveform_style", WAVEFORM_MODE.EXPANDED)), 0, 3);
         });
         softTakeoverTargets = Object.create(null);
+        lastAnalogTarget = Object.create(null);
         setupSoftTakeover();
         active = true;
         connectProgramBrowserState();
@@ -19022,6 +19056,9 @@ var S8WindowsV1 = (function() {
         var normalized = normalizeAnalog(id, event.rawValue);
         if (normalized === null) {
             return;
+        }
+        if (DECK_SECTION_ROLES[target.role]) {
+            pickUpOnRetarget(id, target);
         }
         if (target.role === "LINEFADER" && LINEAR_CHANNEL_FADERS) {
             safeSet(target.group, target.key, normalized);
